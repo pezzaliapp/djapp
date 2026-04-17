@@ -8,7 +8,7 @@
  *   notifica l'utente e skippa il waiting automaticamente
  */
 
-const APP_VERSION = 'djapp-v1.7.5'
+const APP_VERSION = 'djapp-v1.7.0'
 const CACHE_NAME = `${APP_VERSION}`
 
 // Asset da pre-cachare (vengono aggiornati ad ogni build)
@@ -25,6 +25,7 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(PRECACHE_URLS)
     }).then(() => {
+      // Attiva subito senza aspettare che le tab si chiudano
       return self.skipWaiting()
     })
   )
@@ -45,6 +46,7 @@ self.addEventListener('activate', (event) => {
           })
       )
     }).then(() => {
+      // Prendi controllo di tutte le tabs aperte subito
       return self.clients.claim()
     })
   )
@@ -56,31 +58,8 @@ self.addEventListener('fetch', (event) => {
   // Solo richieste GET
   if (event.request.method !== 'GET') return
 
-  const url = new URL(event.request.url)
-
-  // ── ESCLUDI: blob: URL (file audio locali, objectURL)
-  // Il SW NON deve mai intercettare blob: URL — Chrome li gestisce internamente
-  if (url.protocol === 'blob:') return
-
-  // ── ESCLUDI: richieste audio (per destination o estensione)
-  // Lascia che Chrome gestisca direttamente l'audio senza passare dalla cache SW
-  if (
-    event.request.destination === 'audio' ||
-    url.pathname.endsWith('.mp3') ||
-    url.pathname.endsWith('.wav') ||
-    url.pathname.endsWith('.aac') ||
-    url.pathname.endsWith('.m4a') ||
-    url.pathname.endsWith('.flac') ||
-    url.pathname.endsWith('.ogg') ||
-    url.pathname.endsWith('.aiff')
-  ) {
-    return // Lascia gestire al browser nativamente
-  }
-
-  // ── ESCLUDI: chrome-extension e altre origini non-http
-  if (!url.protocol.startsWith('http')) return
-
   // Per le richieste di navigazione (HTML): Network First
+  // così il browser vede sempre la versione più recente
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
@@ -94,7 +73,7 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Per gli asset statici (JS, CSS): Cache First
+  // Per gli asset statici (JS, CSS, immagini): Cache First
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached
